@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Loan;
 use App\Models\Book;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -24,8 +25,9 @@ class LoanController extends Controller
 
     public function store(Request $request)
     {
+        
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
+            'user_email' => 'required|email|exists:users,email',
             'book_id' => 'required|exists:books,id',
         ]);
 
@@ -35,23 +37,36 @@ class LoanController extends Controller
 
         try {
             $loan = DB::transaction(function () use ($request) {
+                // Buscar usuario por email
+                $user = User::where('email', $request->user_email)->first();
+
+                if (!$user) {
+                    throw new \Exception('User not found');
+                }
+
+                // Buscar libro con bloqueo para evitar préstamos simultáneos
+                
                 $book = Book::lockForUpdate()->find($request->book_id);
 
                 if (!$book) {
                     throw new \Exception('Book not found');
                 }
 
-                if (!$book->disponible) {
+
+                if (!$book->available) {
                     throw new \Exception('Book not available');
                 }
 
+                // Crear el préstamo
                 $loan = Loan::create([
-                    'user_id' => $request->user_id,
+                    'user_id' => $user->id,
                     'book_id' => $book->id,
-                    'fecha_prestamo' => now(),
+                    'loan_date' => now(),
+                    'return_date' => $request->fecha_devolucion ?? null,
                 ]);
 
-                $book->disponible = false;
+                // Actualizar disponibilidad del libro
+                $book->available = false;
                 $book->save();
 
                 return $loan;
@@ -82,17 +97,17 @@ class LoanController extends Controller
             return $this->errorResponse('Loan not found', 404);
         }
 
-        if ($loan->fecha_devolucion) {
+        if ($loan->return_date) {
             return $this->errorResponse('This loan was already returned', 400);
         }
 
         try {
             DB::transaction(function () use ($loan) {
-                $loan->fecha_devolucion = now();
+                $loan->return_date = now();
                 $loan->save();
 
                 $book = $loan->book;
-                $book->disponible = true;
+                $book->available = true;
                 $book->save();
             });
 
@@ -102,15 +117,30 @@ class LoanController extends Controller
         }
     }
 
-    public function destroy($id)
-    {
-        $loan = Loan::find($id);
+public function destroy($id)
+{
+    $loan = Loan::with('book')->find($id);
 
-        if (!$loan) {
-            return $this->errorResponse('Loan not found', 404);
-        }
-
-        $loan->delete();
-        return $this->successResponse(null, 'Loan deleted successfully', 200);
+    if (!$loan) {
+        return $this->errorResponse('Loan not found', 404);
     }
+
+    try {
+        DB::transaction(function () use ($loan) {
+            // Si el libro existe, lo marcamos como disponible
+            if ($loan->book) {
+                $loan->book->disponible = true;
+                $loan->book->save();
+            }
+
+            // Luego eliminamos el préstamo
+            $loan->delete();
+        });
+
+        return $this->successResponse(null, 'Loan deleted and book marked available', 200);
+    } catch (\Exception $e) {
+        return $this->errorResponse('Error deleting loan', 500);
+    }
+}
+
 }
