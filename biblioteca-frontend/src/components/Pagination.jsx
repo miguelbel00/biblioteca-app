@@ -21,7 +21,7 @@ export default function Pagination({ meta, onPageChange }) {
         disabled={current_page === 1}
         className="px-4 py-2 rounded-lg bg-wood-medium text-white disabled:opacity-50 hover:bg-wood-dark transition-colors"
       >
-        Anterior
+        Previus
       </button>
 
       {pages.map((page) => (
@@ -43,7 +43,7 @@ export default function Pagination({ meta, onPageChange }) {
         disabled={current_page === last_page}
         className="px-4 py-2 rounded-lg bg-wood-medium text-white disabled:opacity-50 hover:bg-wood-dark transition-colors"
       >
-        Siguiente
+        Next
       </button>
     </div>
   );
