@@ -14,15 +14,15 @@ class StatisticsController extends Controller
     public function index()
     {
         $totalBooks = Book::count();
-        $availableBooks = Book::where('disponible', true)->count();
+        $availableBooks = Book::where('available', true)->count();
         $loanedBooks = max(0, $totalBooks - $availableBooks);
 
-        $activeLoans = Loan::whereNull('fecha_devolucion')->count();
-        $returnedLoans = Loan::whereNotNull('fecha_devolucion')->count();
+        $activeLoans = Loan::whereNull('return_date')->count();
+        $returnedLoans = Loan::whereNotNull('return_date')->count();
 
         // 🔹 top 5 usuarios con más préstamos activos
         $topUsers = User::withCount(['loans' => function($q) {
-            $q->whereNull('fecha_devolucion');
+            $q->whereNull('return_date');
         }])
         ->orderByDesc('loans_count')
         ->take(5)

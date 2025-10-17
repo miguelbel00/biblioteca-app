@@ -55,7 +55,7 @@ export default function Navbar() {
                 `${linkBase} ${isActive ? linkActive : ""}`
               }
             >
-              Loands
+              Loans
             </NavLink>
             <NavLink
               to="/stats"
@@ -98,7 +98,7 @@ export default function Navbar() {
                 `${linkBase} ${isActive ? linkActive : ""}`
               }
             >
-              Loands
+              Loans
             </NavLink>
             <NavLink
               to="/stats"
