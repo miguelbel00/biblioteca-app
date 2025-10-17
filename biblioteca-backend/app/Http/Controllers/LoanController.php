@@ -7,18 +7,19 @@ use App\Models\Book;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Traits\ApiResponseTrait;
 
 class LoanController extends Controller
 {
+    use ApiResponseTrait;
+
     public function index()
     {
-        $loans = Loan::with(['user', 'book'])->get();
+        $loans = Loan::with(['user', 'book'])
+            ->orderBy('id', 'desc')
+            ->paginate(request()->get('per_page', 10));
 
-        $data = [
-            'loans' => $loans,
-            'status' => 200
-        ];
-        return response()->json($data, 200);
+        return $this->paginatedResponse($loans, 'Loans retrieved successfully');
     }
 
     public function store(Request $request)
@@ -29,12 +30,7 @@ class LoanController extends Controller
         ]);
 
         if ($validator->fails()) {
-            $data = [
-                'message' => 'Error validating loan',
-                'errors' => $validator->errors(),
-                'status' => 400
-            ];
-            return response()->json($data, 400);
+            return $this->errorResponse('Error validating loan', 400, $validator->errors());
         }
 
         try {
@@ -42,7 +38,7 @@ class LoanController extends Controller
                 $book = Book::lockForUpdate()->find($request->book_id);
 
                 if (!$book) {
-                    return null;
+                    throw new \Exception('Book not found');
                 }
 
                 if (!$book->disponible) {
@@ -52,7 +48,7 @@ class LoanController extends Controller
                 $loan = Loan::create([
                     'user_id' => $request->user_id,
                     'book_id' => $book->id,
-                    'loan_date' => now(),
+                    'fecha_prestamo' => now(),
                 ]);
 
                 $book->disponible = false;
@@ -61,26 +57,9 @@ class LoanController extends Controller
                 return $loan;
             });
 
-            if (!$loan) {
-                $data = [
-                    'message' => 'Error creating loan',
-                    'status' => 500
-                ];
-                return response()->json($data, 500);
-            }
-
-            $data = [
-                'message' => 'Loan created successfully',
-                'loan' => $loan,
-                'status' => 201
-            ];
-            return response()->json($data, 201);
+            return $this->successResponse($loan->load(['user', 'book']), 'Loan created successfully', 201);
         } catch (\Exception $e) {
-            $data = [
-                'message' => $e->getMessage(),
-                'status' => 400
-            ];
-            return response()->json($data, 400);
+            return $this->errorResponse($e->getMessage(), 400);
         }
     }
 
@@ -89,43 +68,27 @@ class LoanController extends Controller
         $loan = Loan::with(['user', 'book'])->find($id);
 
         if (!$loan) {
-            $data = [
-                'message' => 'Loan not found',
-                'status' => 404
-            ];
-            return response()->json($data, 404);
+            return $this->errorResponse('Loan not found', 404);
         }
 
-        $data = [
-            'loan' => $loan,
-            'status' => 200
-        ];
-        return response()->json($data, 200);
+        return $this->successResponse($loan, 'Loan retrieved successfully', 200);
     }
 
     public function returnBook($id)
     {
-        $loan = Loan::find($id);
+        $loan = Loan::with('book')->find($id);
 
         if (!$loan) {
-            $data = [
-                'message' => 'Loan not found',
-                'status' => 404
-            ];
-            return response()->json($data, 404);
+            return $this->errorResponse('Loan not found', 404);
         }
 
-        if ($loan->return_date) {
-            $data = [
-                'message' => 'This loan was already returned',
-                'status' => 400
-            ];
-            return response()->json($data, 400);
+        if ($loan->fecha_devolucion) {
+            return $this->errorResponse('This loan was already returned', 400);
         }
 
         try {
             DB::transaction(function () use ($loan) {
-                $loan->return_date = now();
+                $loan->fecha_devolucion = now();
                 $loan->save();
 
                 $book = $loan->book;
@@ -133,18 +96,9 @@ class LoanController extends Controller
                 $book->save();
             });
 
-            $data = [
-                'message' => 'Loan returned successfully',
-                'loan' => $loan,
-                'status' => 200
-            ];
-            return response()->json($data, 200);
+            return $this->successResponse($loan->load('book'), 'Loan returned successfully', 200);
         } catch (\Exception $e) {
-            $data = [
-                'message' => 'Error returning loan',
-                'status' => 500
-            ];
-            return response()->json($data, 500);
+            return $this->errorResponse('Error returning loan', 500);
         }
     }
 
@@ -153,19 +107,10 @@ class LoanController extends Controller
         $loan = Loan::find($id);
 
         if (!$loan) {
-            $data = [
-                'message' => 'Loan not found',
-                'status' => 404
-            ];
-            return response()->json($data, 404);
+            return $this->errorResponse('Loan not found', 404);
         }
 
         $loan->delete();
-
-        $data = [
-            'message' => 'Loan deleted successfully',
-            'status' => 200
-        ];
-        return response()->json($data, 200);
+        return $this->successResponse(null, 'Loan deleted successfully', 200);
     }
 }
