@@ -4,142 +4,91 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Validator;
+use App\Traits\ApiResponseTrait;
+
 class UserController extends Controller
 {
+    use ApiResponseTrait;
+
     public function index()
     {
-        return User::all();
+        $users = User::orderBy('id', 'desc')->paginate(request()->get('per_page', 10));
+        return $this->paginatedResponse($users, 'Users retrieved successfully');
     }
 
     public function store(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
-            "name"=> "required|string",
-            "email"=> "required|email|unique:users,email",
+            "name" => "required|string",
+            "email" => "required|email|unique:users,email",
         ]);
 
-        if($validator->fails())
-        {
-            $data=[
-                'message'=>'Error validation user',
-                'errors'=>$validator->errors(),
-                'status'=>400
-            ];
-            return response()->json($data,400);
+        if ($validator->fails()) {
+            return $this->errorResponse('Error validating user', 400, $validator->errors());
         }
 
-        
         $user = User::create([
-            'name'=> $request->name,
-            'email'=> $request->email,
-
+            'name' => $request->name,
+            'email' => $request->email,
         ]);
 
-
-        if(!$user)
-        {
-            $data=[
-                'message'=>'Error creating user',
-                'status'=>500
-            ];
-            return response()->json($data,500);
+        if (!$user) {
+            return $this->errorResponse('Error creating user', 500);
         }
 
-        return response()->json($user, 201);
+        return $this->successResponse($user, 'User created successfully', 201);
     }
 
     public function show($id)
     {
         $user = User::find($id);
 
-        if(!$user)
-        {
-            $data=[
-                'message'=>'User not found',
-                'status'=>404
-            ];
-            return response()->json($data,404);
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
         }
-        $data=[
-                'user'=>$user,
-                'status'=>200
-            ];
-            return response()->json($data,200);
+
+        return $this->successResponse($user, 'User retrieved successfully', 200);
     }
 
     public function update(Request $request, $id)
     {
         $user = User::find($id);
 
-        if(!$user)
-        {
-            $data=[
-                'message'=>'User not found',
-                'status'=>404
-            ];
-            return response()->json($data,404);
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
         }
 
-        $validated = Validator::make($request ->all(),[
+        $validated = Validator::make($request->all(), [
             'name' => 'string',
-            'email' => 'string|email|unique:users,email,'.$id,
+            'email' => 'string|email|unique:users,email,' . $id,
         ]);
 
-        if($validated->fails())
-        {
-            $data=[
-                'message'=>'Error validation user',
-                'errors'=>$validated->errors(),
-                'status'=>400
-            ];
-            return response()->json($data,400);
+        if ($validated->fails()) {
+            return $this->errorResponse('Error validating user', 400, $validated->errors());
         }
 
-        if($request->has('name'))
-        {
-            $user->name = $request->name;
-        }
-        if($request->has('email'))
-        {
-            $user->email = $request->email;
-        }
-        if($request->has('password'))
-        {
+        $user->fill($request->only(['name', 'email']));
+
+        if ($request->has('password')) {
             $user->password = bcrypt($request->password);
         }
 
         $user->save();
-        $data=[
-                'message'=>'User updated',
-                'user'=>$user,
-                'status'=>200
-            ];
-        return response()->json($user);
+
+        return $this->successResponse($user, 'User updated successfully', 200);
     }
 
     public function destroy($id)
-
     {
         $user = User::find($id);
-        
-        if(!$user)
-        {
-            $data=[
-                'message'=>'User not found',
-                'status'=>404
-            ];
-            return response()->json($data,404);
+
+        if (!$user) {
+            return $this->errorResponse('User not found', 404);
         }
 
         $user->delete();
-        $data=[
-            'message'=> 'User deleted',
-            'status'=>200
-        ];
-            
 
-        return response()->json($data,200);
+        return $this->successResponse(null, 'User deleted successfully', 200);
     }
 }
