@@ -16,8 +16,8 @@ class Book extends Model
         'available',
     ];
 
-    public function user()
+    public function loans()
 {
-    return $this->belongsTo(Loan::class);
+    return $this->hasMany(Loan::class);
 }
 }

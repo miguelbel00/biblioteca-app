@@ -19,7 +19,7 @@ class User extends Authenticatable
         'email',
     ];
     
-    public function books()
+    public function loans()
     {
         return $this->hasMany(Loan::class);
     } 
