@@ -18,6 +18,11 @@ class User extends Authenticatable
         'name',
         'email',
     ];
+    
+    public function books()
+    {
+        return $this->hasMany(Loan::class);
+    } 
 
 
 }
