@@ -15,4 +15,9 @@ class Book extends Model
         'genre',
         'available',
     ];
+
+    public function user()
+{
+    return $this->belongsTo(Loan::class);
+}
 }
